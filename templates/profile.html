@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{ user.login }} — GitScore</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    body { background: #0d1117; color: #e6edf3; }
+
+    .card {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 16px;
+    }
+    .card:hover { border-color: #30363d; }
+
+    /* Score ring */
+    #score-ring { transform: rotate(-90deg); }
+    #score-track { transition: stroke-dashoffset 1.6s cubic-bezier(0.4, 0, 0.2, 1); }
+
+    /* Breakdown bars */
+    .bar-fill {
+      height: 100%;
+      border-radius: 9999px;
+      width: 0%;
+      transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Fade-in on load */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { opacity: 0; animation: fadeUp 0.5s ease forwards; }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    .delay-4 { animation-delay: 0.4s; }
+    .delay-5 { animation-delay: 0.5s; }
+
+    /* Repo cards */
+    .repo-card {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 12px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .repo-card:hover {
+      border-color: #388bfd;
+      transform: translateY(-2px);
+    }
+
+    /* Share button */
+    .share-btn {
+      background: rgba(88,166,255,0.1);
+      border: 1px solid rgba(88,166,255,0.25);
+      color: #58a6ff;
+      transition: background 0.2s;
+    }
+    .share-btn:hover { background: rgba(88,166,255,0.18); }
+
+    /* Copied toast */
+    #toast {
+      transition: opacity 0.3s;
+    }
+
+    /* Grid */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1px;
+      background: #21262d;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .stat-cell {
+      background: #161b22;
+      padding: 14px 16px;
+    }
+
+    /* Label badge */
+    .label-badge {
+      border-radius: 999px;
+      padding: 4px 14px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0d1117; }
+    ::-webkit-scrollbar-thumb { background: #21262d; border-radius: 3px; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- ── Top Nav ── -->
+  <nav class="sticky top-0 z-50 border-b border-[#21262d] bg-[#0d1117]/90 backdrop-blur-md">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-2 text-[#8b949e] hover:text-white transition-colors text-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Back
+      </a>
+      <div class="flex items-center gap-2">
+        <svg class="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+        </svg>
+        <span class="text-white font-bold text-sm">GitScore</span>
+      </div>
+      <button onclick="shareProfile()" class="share-btn flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-full">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+        </svg>
+        Share
+      </button>
+    </div>
+  </nav>
+
+  <!-- Copy toast -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 opacity-0 pointer-events-none
+       bg-[#161b22] border border-[#30363d] text-white text-sm px-4 py-2.5 rounded-full shadow-xl">
+    🔗 Link copied to clipboard!
+  </div>
+
+  <main class="max-w-6xl mx-auto px-4 py-8">
+
+    <!-- ── SECTION 1: Profile + Score ── -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+      <!-- Profile Info -->
+      <div class="lg:col-span-2 card p-6 fade-up delay-1">
+        <div class="flex items-start gap-5">
+          <img
+            src="{{ user.avatar_url }}"
+            alt="{{ user.login }}"
+            class="w-20 h-20 rounded-full ring-2 ring-[#30363d] flex-shrink-0"
+          />
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-3 mb-1">
+              <h1 class="text-2xl font-bold text-white truncate">
+                {{ user.name or user.login }}
+              </h1>
+              <a href="https://github.com/{{ user.login }}" target="_blank"
+                 class="text-[#58a6ff] text-sm font-medium hover:underline">
+                @{{ user.login }}
+              </a>
+            </div>
+
+            {% if user.bio %}
+            <p class="text-[#8b949e] text-sm mb-3 leading-relaxed">{{ user.bio }}</p>
+            {% endif %}
+
+            <div class="flex flex-wrap gap-3 text-[#8b949e] text-xs mb-4">
+              {% if user.company %}
+              <span class="flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+                {{ user.company }}
+              </span>
+              {% endif %}
+              {% if user.location %}
+              <span class="flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                {{ user.location }}
+              </span>
+              {% endif %}
+              {% if user.blog %}
+              <a href="{{ user.blog if user.blog.startswith('http') else 'https://' + user.blog }}"
+                 target="_blank" class="flex items-center gap-1 hover:text-[#58a6ff] transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                </svg>
+                {{ user.blog[:30] }}{% if user.blog|length > 30 %}…{% endif %}
+              </a>
+              {% endif %}
+              {% if user.twitter_username %}
+              <a href="https://twitter.com/{{ user.twitter_username }}" target="_blank"
+                 class="flex items-center gap-1 hover:text-[#58a6ff] transition-colors">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+                @{{ user.twitter_username }}
+              </a>
+              {% endif %}
+            </div>
+
+            <!-- Quick stats grid -->
+            <div class="stat-grid">
+              <div class="stat-cell">
+                <div class="text-xl font-bold text-white">{{ user.public_repos }}</div>
+                <div class="text-[#8b949e] text-xs mt-0.5">Repositories</div>
+              </div>
+              <div class="stat-cell">
+                <div class="text-xl font-bold text-white">{{ '{:,}'.format(user.followers) }}</div>
+                <div class="text-[#8b949e] text-xs mt-0.5">Followers</div>
+              </div>
+              <div class="stat-cell">
+                <div class="text-xl font-bold text-white">{{ user.following }}</div>
+                <div class="text-[#8b949e] text-xs mt-0.5">Following</div>
+              </div>
+              <div class="stat-cell">
+                <div class="text-xl font-bold text-white">{{ user.public_gists }}</div>
+                <div class="text-[#8b949e] text-xs mt-0.5">Gists</div>
+              </div>
+            </div>
+
+            <div class="mt-3 text-[#484f58] text-xs">
+              Joined {{ user.created_at[:10] }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Score Ring -->
+      <div class="card p-6 flex flex-col items-center justify-center fade-up delay-2">
+        <div class="text-[#8b949e] text-xs font-semibold uppercase tracking-widest mb-4">Developer Score</div>
+
+        <div class="relative w-48 h-48">
+          <svg id="score-ring" width="192" height="192" viewBox="0 0 192 192">
+            <!-- Track -->
+            <circle cx="96" cy="96" r="80" fill="none" stroke="#21262d" stroke-width="14"/>
+            <!-- Fill -->
+            <circle
+              id="score-track"
+              cx="96" cy="96" r="80"
+              fill="none"
+              stroke="{{ label.color }}"
+              stroke-width="14"
+              stroke-linecap="round"
+              stroke-dasharray="502.65"
+              stroke-dashoffset="502.65"
+              style="filter: drop-shadow({{ label.glow }})"
+            />
+          </svg>
+          <!-- Center text -->
+          <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <span id="score-number" class="text-5xl font-black" style="color: {{ label.color }}">0</span>
+            <span class="text-[#8b949e] text-sm">/ 100</span>
+          </div>
+        </div>
+
+        <!-- Label -->
+        <div class="mt-4 label-badge" style="background: {{ label.color }}22; color: {{ label.color }}; border: 1px solid {{ label.color }}44;">
+          {{ label.emoji }} {{ label.label }}
+        </div>
+        <a href="https://github.com/{{ user.login }}" target="_blank"
+           class="mt-4 text-[#58a6ff] text-xs hover:underline flex items-center gap-1">
+          View on GitHub
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+
+    <!-- ── SECTION 2: Score Breakdown ── -->
+    <div class="card p-6 mb-6 fade-up delay-3">
+      <h2 class="text-white font-bold text-base mb-5 flex items-center gap-2">
+        <svg class="w-4 h-4 text-[#58a6ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+        Score Breakdown
+      </h2>
+
+      <div class="space-y-4">
+        {% for key, cat in [
+            ('activity',     score.activity),
+            ('impact',       score.impact),
+            ('community',    score.community),
+            ('code_quality', score.code_quality),
+            ('consistency',  score.consistency),
+        ] %}
+        {% set pct = (cat.score / cat.max * 100)|round|int %}
+        {% if pct >= 80 %}{% set bar_color = '#3fb950' %}
+        {% elif pct >= 60 %}{% set bar_color = '#58a6ff' %}
+        {% elif pct >= 40 %}{% set bar_color = '#d29922' %}
+        {% else %}{% set bar_color = '#f85149' %}{% endif %}
+
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium text-white">{{ cat.label }}</span>
+              <span class="text-xs text-[#484f58]">{{ cat.detail }}</span>
+            </div>
+            <div class="flex items-baseline gap-1">
+              <span class="text-sm font-bold" style="color: {{ bar_color }}">{{ cat.score }}</span>
+              <span class="text-xs text-[#484f58]">/ {{ cat.max }}</span>
+            </div>
+          </div>
+          <div class="h-2 bg-[#21262d] rounded-full overflow-hidden">
+            <div
+              class="bar-fill"
+              style="background: {{ bar_color }};"
+              data-width="{{ pct }}"
+            ></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ── SECTION 3: Top Repos + Languages ── -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+      <!-- Top Repos (2 cols) -->
+      <div class="lg:col-span-2 fade-up delay-4">
+        <h2 class="text-white font-bold text-base mb-4 flex items-center gap-2">
+          <svg class="w-4 h-4 text-[#58a6ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+          </svg>
+          Top Repositories
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {% for repo in top_repos %}
+          <a href="{{ repo.html_url }}" target="_blank" class="repo-card p-4 block">
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <div class="font-semibold text-[#58a6ff] text-sm truncate hover:underline">
+                {{ repo.name }}
+              </div>
+              {% if repo.language %}
+              <span class="text-xs text-[#8b949e] flex-shrink-0 bg-[#21262d] px-2 py-0.5 rounded-full">
+                {{ repo.language }}
+              </span>
+              {% endif %}
+            </div>
+
+            {% if repo.description %}
+            <p class="text-[#8b949e] text-xs leading-relaxed mb-3 line-clamp-2">
+              {{ repo.description }}
+            </p>
+            {% endif %}
+
+            <div class="flex items-center gap-3 text-[#8b949e] text-xs">
+              <span class="flex items-center gap-1">
+                <svg class="w-3.5 h-3.5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+                {{ '{:,}'.format(repo.stargazers_count) }}
+              </span>
+              <span class="flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                </svg>
+                {{ repo.forks_count }}
+              </span>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Languages -->
+      <div class="card p-6 fade-up delay-5">
+        <h2 class="text-white font-bold text-base mb-5 flex items-center gap-2">
+          <svg class="w-4 h-4 text-[#58a6ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+          </svg>
+          Languages
+        </h2>
+
+        {% if languages %}
+        <!-- Stacked bar -->
+        <div class="flex h-3 rounded-full overflow-hidden mb-4 gap-0.5">
+          {% for lang in languages %}
+          <div style="width: {{ lang.percentage }}%; background: {{ lang.color }};" title="{{ lang.language }} {{ lang.percentage }}%"></div>
+          {% endfor %}
+        </div>
+
+        <div class="space-y-3">
+          {% for lang in languages %}
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background: {{ lang.color }};"></span>
+              <span class="text-sm text-[#c9d1d9]">{{ lang.language }}</span>
+            </div>
+            <span class="text-xs text-[#8b949e]">{{ lang.percentage }}%</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-[#484f58] text-sm">No language data available.</p>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- ── Footer ── -->
+    <div class="text-center text-[#484f58] text-xs mt-8 pb-6">
+      Built with GitScore · Data from GitHub Public API · Scores refresh every hour
+    </div>
+
+  </main>
+
+  <script>
+    const TOTAL_SCORE = {{ score.total }};
+    const CIRCUMFERENCE = 502.65;
+
+    window.addEventListener('load', () => {
+      // Animate score ring
+      const track = document.getElementById('score-track');
+      const offset = CIRCUMFERENCE - (TOTAL_SCORE / 100) * CIRCUMFERENCE;
+      setTimeout(() => { track.style.strokeDashoffset = offset; }, 150);
+
+      // Animate score number
+      const numberEl = document.getElementById('score-number');
+      let current = 0;
+      const step = TOTAL_SCORE / 80;
+      const timer = setInterval(() => {
+        current += step;
+        if (current >= TOTAL_SCORE) { current = TOTAL_SCORE; clearInterval(timer); }
+        numberEl.textContent = Math.round(current);
+      }, 20);
+
+      // Animate bars
+      setTimeout(() => {
+        document.querySelectorAll('.bar-fill').forEach(bar => {
+          bar.style.width = bar.dataset.width + '%';
+        });
+      }, 300);
+    });
+
+    // Share
+    function shareProfile() {
+      const url = window.location.href;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(showToast);
+      } else {
+        const el = document.createElement('textarea');
+        el.value = url;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        showToast();
+      }
+    }
+
+    function showToast() {
+      const toast = document.getElementById('toast');
+      toast.style.opacity = '1';
+      setTimeout(() => { toast.style.opacity = '0'; }, 2500);
+    }
+  </script>
+</body>
+</html>
